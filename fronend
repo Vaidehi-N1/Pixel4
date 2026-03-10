@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+<meta charset="UTF-8">
+<title>Guardly AI</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+
+<style>
+
+body{
+margin:0;
+font-family:Arial;
+background:#0f172a;
+color:white;
+}
+
+header{
+display:flex;
+justify-content:space-between;
+padding:20px 50px;
+background:#020617;
+}
+
+.logo{
+font-size:22px;
+font-weight:bold;
+}
+
+.hero{
+text-align:center;
+margin-top:40px;
+}
+
+.controls{
+display:flex;
+justify-content:center;
+gap:15px;
+margin-top:30px;
+flex-wrap:wrap;
+}
+
+input{
+padding:10px;
+border-radius:8px;
+border:none;
+}
+
+button{
+padding:12px 20px;
+border:none;
+border-radius:8px;
+background:#2563eb;
+color:white;
+cursor:pointer;
+}
+
+button:hover{
+background:#1d4ed8;
+}
+
+#map{
+height:450px;
+width:85%;
+margin:40px auto;
+border-radius:15px;
+}
+
+.status{
+text-align:center;
+margin-bottom:20px;
+opacity:.8;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<header>
+<div class="logo">Guardly AI</div>
+</header>
+
+
+<div class="hero">
+<h1>AI Powered Personal Safety</h1>
+<p>Safer routes using crime data and real-time AI analysis</p>
+</div>
+
+
+<div class="controls">
+
+<input id="start" placeholder="Start location">
+
+<input id="end" placeholder="Destination">
+
+<button onclick="generateRoute()">Find Safe Route</button>
+
+<button onclick="addHeatmap()">Show Crime Heatmap</button>
+
+<button onclick="sendAlert()">Emergency Alert</button>
+
+</div>
+
+
+<div id="map"></div>
+
+<div class="status" id="status">
+System ready!
+</div>
+
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<script>
+
+var map = L.map('map').setView([21.1458,79.0882],12);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+
+maxZoom:19,
+
+}).addTo(map);
+
+
+// Example crime points (demo)
+
+var crimePoints = [
+
+[21.1458,79.0882],
+[21.1500,79.0800],
+[21.1400,79.0950],
+[21.1550,79.1000]
+
+];
+
+var markers=[];
+
+
+function addHeatmap(){
+
+markers.forEach(m=>map.removeLayer(m));
+
+markers=[];
+
+crimePoints.forEach(function(point){
+
+var marker=L.circle(point,{
+
+radius:200,
+
+color:"red"
+
+}).addTo(map);
+
+markers.push(marker);
+
+});
+
+document.getElementById("status").innerHTML="Crime hotspots displayed.";
+
+}
+
+
+function generateRoute(){
+
+var start=document.getElementById("start").value;
+
+var end=document.getElementById("end").value;
+
+document.getElementById("status").innerHTML="Calculating safest route using AI.";
+
+alert("Route feature will connect to Python AI backend.");
+
+}
+
+
+function sendAlert(){
+
+document.getElementById("status").innerHTML="Emergency alert sent with your location.";
+
+alert("Emergency contacts notified!");
+
+}
+
+</script>
+
+</body>
+</html>
