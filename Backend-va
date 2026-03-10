@@ -61,11 +61,4 @@ while True:
 
         except:
             pass
-        Zone 0 → Low crime
-        Zone 1 → Medium
-        Zone 2 → High
-        Zone 3 → Very High
-        Zone 4 → Extreme
-        green → safe
-        yellow → moderate
-        red → dangerous
+      
