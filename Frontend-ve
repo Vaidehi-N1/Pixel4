@@ -1,142 +1,270 @@
 <!DOCTYPE html>
-<html lang="en">
-
+<html>
 <head>
-<meta charset="UTF-8">
 <title>Guardly AI</title>
 
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css"/>
 
 <style>
 
 body{
-margin:0;
 font-family:Arial;
-background:#0f172a;
+margin:0;
+background:#111;
 color:white;
-}
-
-header{
-display:flex;
-justify-content:space-between;
-padding:20px 50px;
-background:#020617;
-}
-
-.logo{
-font-size:22px;
-font-weight:bold;
-}
-
-.hero{
 text-align:center;
-margin-top:40px;
 }
 
-.controls{
-display:flex;
-justify-content:center;
-gap:15px;
-margin-top:30px;
-flex-wrap:wrap;
+h1{
+margin:10px;
+}
+
+.container{
+padding:15px;
 }
 
 input{
 padding:10px;
-border-radius:8px;
+margin:6px;
+border-radius:6px;
 border:none;
+width:220px;
 }
 
 button{
-padding:12px 20px;
+padding:10px 15px;
+margin:6px;
 border:none;
-border-radius:8px;
-background:#2563eb;
-color:white;
+border-radius:6px;
 cursor:pointer;
+font-weight:bold;
 }
 
-button:hover{
-background:#1d4ed8;
+#startBtn{
+background:#00c896;
+color:white;
+}
+
+#panicBtn{
+background:red;
+color:white;
+font-size:18px;
 }
 
 #map{
-height:450px;
-width:85%;
-margin:40px auto;
-border-radius:15px;
+height:500px;
+width:95%;
+margin:auto;
+border-radius:10px;
 }
 
-.status{
-text-align:center;
-margin-bottom:20px;
-opacity:.8;
+.hidden{
+display:none;
 }
 
 </style>
-
 </head>
 
 <body>
 
-<header>
-<div class="logo">Guardly AI</div>
-</header>
+<h1>🚨 Guardly AI</h1>
 
+<!-- LOGIN -->
 
-<div class="hero">
-<h1>AI Powered Personal Safety</h1>
-<p>Safer routes using crime data and real-time AI analysis</p>
+<div id="login">
+
+<h2>Login</h2>
+
+<input id="username" placeholder="Username"><br>
+
+<input id="c1" placeholder="Emergency Contact 1"><br>
+<input id="c2" placeholder="Emergency Contact 2"><br>
+<input id="c3" placeholder="Emergency Contact 3"><br>
+
+<button id="startBtn" onclick="login()">Start Guardly</button>
+
 </div>
 
 
-<div class="controls">
+<!-- APP -->
+
+<div id="app" class="hidden">
+
+<div class="container">
 
 <input id="start" placeholder="Start location">
+<input id="end" placeholder="Destination"><br>
 
-<input id="end" placeholder="Destination">
-
-<button onclick="generateRoute()">Find Safe Route</button>
-
-<button onclick="addHeatmap()">Show Crime Heatmap</button>
-
-<button onclick="sendAlert()">Emergency Alert</button>
+<button onclick="findRoute()">Find Route</button>
+<button id="panicBtn" onclick="panic()">PANIC</button>
 
 </div>
-
 
 <div id="map"></div>
 
-<div class="status" id="status">
-System ready!
 </div>
 
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
+<script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
 
 <script>
 
-var map = L.map('map').setView([21.1458,79.0882],12);
+var map
+var userMarker
+var routeControl
+
+// LOGIN
+
+function login(){
+
+let user=document.getElementById("username").value
+
+let contacts=[
+document.getElementById("c1").value,
+document.getElementById("c2").value,
+document.getElementById("c3").value
+]
+
+localStorage.setItem("guardlyUser",user)
+localStorage.setItem("contacts",JSON.stringify(contacts))
+
+document.getElementById("login").classList.add("hidden")
+document.getElementById("app").classList.remove("hidden")
+
+initMap()
+
+}
+
+
+// AUTO LOGIN
+
+window.onload=function(){
+
+if(localStorage.getItem("guardlyUser")){
+
+document.getElementById("login").classList.add("hidden")
+document.getElementById("app").classList.remove("hidden")
+
+initMap()
+
+}
+
+}
+
+
+
+// MAP INIT
+
+function initMap(){
+
+map=L.map('map').setView([18.5204,73.8567],13)
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+maxZoom:19
+}).addTo(map)
 
-maxZoom:19,
+loadCrimeHeatmap()
+trackUser()
 
-}).addTo(map);
+}
 
 
-async function loadCrimeData(){
 
-let response = await fetch("http://127.0.0.1:5000/crime-data")
+// CRIME DATA (DEMO DATASET)
 
-let crimes = await response.json()
+function loadCrimeHeatmap(){
 
-crimes.forEach(function(crime){
+var crimePoints=[
 
-L.circle([crime.latitude,crime.longitude],{
+[18.5204,73.8567,0.9],
+[18.5180,73.8550,0.7],
+[18.5220,73.8571,0.8],
+[18.5250,73.8600,0.6],
+[18.5270,73.8540,0.9]
 
-radius:300,
-color:"red"
+]
+
+L.heatLayer(crimePoints,{
+radius:25,
+blur:15
+}).addTo(map)
+
+checkDanger(crimePoints)
+
+}
+
+
+
+// LOCATION TRACKING
+
+function trackUser(){
+
+if(navigator.geolocation){
+
+navigator.geolocation.watchPosition(pos=>{
+
+let lat=pos.coords.latitude
+let lon=pos.coords.longitude
+
+if(userMarker){
+
+userMarker.setLatLng([lat,lon])
+
+}else{
+
+userMarker=L.marker([lat,lon]).addTo(map)
+.bindPopup("You are here")
+
+}
+
+map.setView([lat,lon],15)
+
+})
+
+}
+
+}
+
+
+
+// ROUTE FUNCTION
+
+function findRoute(){
+
+let start=document.getElementById("start").value
+let end=document.getElementById("end").value
+
+Promise.all([
+
+fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${start}`).then(r=>r.json()),
+fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${end}`).then(r=>r.json())
+
+])
+
+.then(data=>{
+
+let s=data[0][0]
+let e=data[1][0]
+
+if(routeControl){
+
+map.removeControl(routeControl)
+
+}
+
+routeControl=L.Routing.control({
+
+waypoints:[
+L.latLng(s.lat,s.lon),
+L.latLng(e.lat,e.lon)
+],
+
+routeWhileDragging:false
 
 }).addTo(map)
 
@@ -144,63 +272,103 @@ color:"red"
 
 }
 
-// Example crime points (demo)
-
-var crimePoints = [
-
-[21.1458,79.0882],
-[21.1500,79.0800],
-[21.1400,79.0950],
-[21.1550,79.1000]
-
-];
-
-var markers=[];
 
 
-function addHeatmap(){
+// PANIC ALERT
 
-markers.forEach(m=>map.removeLayer(m));
+function panic(){
 
-markers=[];
+let contacts=JSON.parse(localStorage.getItem("contacts"))
 
-crimePoints.forEach(function(point){
+navigator.geolocation.getCurrentPosition(pos=>{
 
-var marker=L.circle(point,{
+let lat=pos.coords.latitude
+let lon=pos.coords.longitude
 
-radius:200,
+alert(
+"🚨 EMERGENCY ALERT\n\nLocation: "+lat+","+lon+
+"\n\nContacts:\n"+contacts.join("\n")
+)
 
-color:"red"
-
-}).addTo(map);
-
-markers.push(marker);
-
-});
-
-document.getElementById("status").innerHTML="Crime hotspots displayed.";
+})
 
 }
 
 
-function generateRoute(){
 
-var start=document.getElementById("start").value;
+// VOICE DETECTION
 
-var end=document.getElementById("end").value;
+if('webkitSpeechRecognition' in window){
 
-document.getElementById("status").innerHTML="Calculating safest route using AI.";
+const recognition=new webkitSpeechRecognition()
 
-alert("Route feature will connect to Python AI backend.");
+recognition.continuous=true
+
+recognition.onresult=function(event){
+
+let text=event.results[event.results.length-1][0].transcript.toLowerCase()
+
+if(text.includes("help")||text.includes("save me")){
+
+panic()
+
+}
+
+}
+
+recognition.start()
 
 }
 
 
-function sendAlert(){
 
-document.getElementById("status").innerHTML="Emergency alert sent with your location.";
+// DANGER DETECTION
 
-alert("Emergency contacts notified!");
+function checkDanger(crimes){
+
+navigator.geolocation.watchPosition(pos=>{
+
+let userLat=pos.coords.latitude
+let userLon=pos.coords.longitude
+
+crimes.forEach(c=>{
+
+let dist=getDistance(userLat,userLon,c[0],c[1])
+
+if(dist<200){
+
+alert("⚠️ WARNING: You are entering a high crime area!")
+
+}
+
+})
+
+})
+
+}
+
+
+
+// DISTANCE CALCULATION
+
+function getDistance(lat1,lon1,lat2,lon2){
+
+const R=6371e3
+
+const φ1=lat1*Math.PI/180
+const φ2=lat2*Math.PI/180
+
+const Δφ=(lat2-lat1)*Math.PI/180
+const Δλ=(lon2-lon1)*Math.PI/180
+
+const a=
+Math.sin(Δφ/2)*Math.sin(Δφ/2)+
+Math.cos(φ1)*Math.cos(φ2)*
+Math.sin(Δλ/2)*Math.sin(Δλ/2)
+
+const c=2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a))
+
+return R*c
 
 }
 

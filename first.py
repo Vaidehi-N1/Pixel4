@@ -125,6 +125,30 @@ maxZoom:19,
 }).addTo(map);
 
 
+
+async function loadCrimeData(){
+
+let response = await fetch("http://127.0.0.1:5000/crime-data")
+
+let crimes = await response.json()
+
+crimes.forEach(function(crime){
+
+L.circle([crime.latitude,crime.longitude],{
+
+radius:300,
+color:"red"
+
+}).addTo(map)
+
+})
+
+}
+
+loadCrimeData()
+
+
+
 // Example crime points (demo)
 
 var crimePoints = [
