@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<title>Guardly AI</title>
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css"/>
+
+<style>
+
+body{
+font-family:Arial;
+margin:0;
+background:#111;
+color:white;
+text-align:center;
+}
+
+input{
+padding:10px;
+margin:6px;
+border-radius:6px;
+border:none;
+width:220px;
+}
+
+button{
+padding:10px 15px;
+margin:6px;
+border:none;
+border-radius:6px;
+cursor:pointer;
+font-weight:bold;
+}
+
+#panicBtn{
+background:red;
+color:white;
+font-size:18px;
+}
+
+#map{
+height:500px;
+width:95%;
+margin:auto;
+border-radius:10px;
+}
+
+.hidden{
+display:none;
+}
+
+</style>
+</head>
+
+<body>
+
+<h1>🚨 Guardly AI</h1>
+
+<!-- LOGIN -->
+
+<div id="login">
+
+<h2>Login</h2>
+
+<input id="username" placeholder="Username"><br>
+
+<input id="c1" placeholder="Emergency Contact 1"><br>
+<input id="c2" placeholder="Emergency Contact 2"><br>
+<input id="c3" placeholder="Emergency Contact 3"><br>
+
+<button onclick="login()">Start Guardly</button>
+
+</div>
+
+
+<!-- APP -->
+
+<div id="app" class="hidden">
+
+<input id="start" placeholder="Start location">
+<input id="end" placeholder="Destination"><br>
+
+<button onclick="findRoute()">Find Route</button>
+<button id="panicBtn" onclick="panic()">PANIC</button>
+
+<div id="map"></div>
+
+</div>
+
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
+<script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+
+<script>
+
+var map
+var userMarker
+var routeControl
+
+// LOGIN
+
+function login(){
+
+let user=document.getElementById("username").value
+
+let contacts=[
+document.getElementById("c1").value,
+document.getElementById("c2").value,
+document.getElementById("c3").value
+]
+
+localStorage.setItem("user",user)
+localStorage.setItem("contacts",JSON.stringify(contacts))
+
+document.getElementById("login").classList.add("hidden")
+document.getElementById("app").classList.remove("hidden")
+
+initMap()
+
+}
+
+
+// AUTO LOGIN
+
+window.onload=function(){
+
+if(localStorage.getItem("user")){
+
+document.getElementById("login").classList.add("hidden")
+document.getElementById("app").classList.remove("hidden")
+
+initMap()
+
+}
+
+}
+
+
+
+// MAP
+
+function initMap(){
+
+map=L.map('map').setView([21.1458,79.0882],12)
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+maxZoom:19
+}).addTo(map)
+
+loadCrimeData()
+trackUser()
+
+}
+
+
+
+// CRIME DATA SCATTERED ACROSS NAGPUR
+
+function loadCrimeData(){
+
+var crimePoints=[
+
+// Central
+[21.1458,79.0882,0.9],
+[21.1490,79.0820,0.8],
+[21.1515,79.0895,0.7],
+[21.1470,79.0950,0.8],
+
+// North
+[21.1650,79.0850,0.8],
+[21.1750,79.0950,0.7],
+[21.1800,79.1100,0.6],
+[21.1700,79.1200,0.8],
+[21.1850,79.1050,0.7],
+
+// East
+[21.1400,79.1100,0.8],
+[21.1350,79.1200,0.9],
+[21.1380,79.1300,0.7],
+[21.1420,79.1400,0.8],
+[21.1500,79.1350,0.6],
+
+// South
+[21.1300,79.0900,0.6],
+[21.1250,79.1000,0.7],
+[21.1180,79.0850,0.8],
+[21.1100,79.0950,0.7],
+[21.1150,79.1050,0.6],
+
+// West
+[21.1480,79.0600,0.7],
+[21.1500,79.0500,0.6],
+[21.1400,79.0550,0.8],
+[21.1350,79.0650,0.7],
+[21.1450,79.0700,0.6],
+
+// Outer
+[21.2000,79.1000,0.7],
+[21.1000,79.0800,0.6],
+[21.1700,79.0600,0.7],
+[21.1600,79.0400,0.6],
+[21.1200,79.0600,0.8]
+
+]
+
+
+// HEATMAP
+
+L.heatLayer(crimePoints,{
+radius:30,
+blur:20
+}).addTo(map)
+
+
+// MARKERS
+
+crimePoints.forEach(c=>{
+
+var marker=L.circleMarker([c[0],c[1]],{
+
+radius:8,
+color:"red",
+fillColor:"red",
+fillOpacity:0.9
+
+}).addTo(map)
+
+marker.bindPopup("⚠ Crime reported here")
+
+L.circle([c[0],c[1]],{
+
+radius:200,
+color:"red",
+fillOpacity:0.15
+
+}).addTo(map)
+
+})
+
+
+checkDanger(crimePoints)
+
+}
+
+
+
+// LIVE LOCATION
+
+function trackUser(){
+
+if(navigator.geolocation){
+
+navigator.geolocation.watchPosition(pos=>{
+
+let lat=pos.coords.latitude
+let lon=pos.coords.longitude
+
+if(userMarker){
+
+userMarker.setLatLng([lat,lon])
+
+}else{
+
+userMarker=L.marker([lat,lon]).addTo(map)
+.bindPopup("You are here")
+
+}
+
+map.setView([lat,lon],14)
+
+})
+
+}
+
+}
+
+
+
+// ROUTE
+
+function findRoute(){
+
+let start=document.getElementById("start").value
+let end=document.getElementById("end").value
+
+Promise.all([
+
+fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${start}`).then(r=>r.json()),
+fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${end}`).then(r=>r.json())
+
+])
+
+.then(data=>{
+
+let s=data[0][0]
+let e=data[1][0]
+
+if(routeControl){
+map.removeControl(routeControl)
+}
+
+routeControl=L.Routing.control({
+
+waypoints:[
+L.latLng(s.lat,s.lon),
+L.latLng(e.lat,e.lon)
+]
+
+}).addTo(map)
+
+})
+
+}
+
+
+
+// PANIC
+
+function panic(){
+
+let contacts=JSON.parse(localStorage.getItem("contacts"))
+
+navigator.geolocation.getCurrentPosition(pos=>{
+
+let lat=pos.coords.latitude
+let lon=pos.coords.longitude
+
+alert(
+"🚨 EMERGENCY ALERT\n\nLocation: "+lat+","+lon+
+"\n\nContacts:\n"+contacts.join("\n")
+)
+
+})
+
+}
+
+
+
+// VOICE DETECTION
+
+if('webkitSpeechRecognition' in window){
+
+const recognition=new webkitSpeechRecognition()
+
+recognition.continuous=true
+
+recognition.onresult=function(event){
+
+let text=event.results[event.results.length-1][0].transcript.toLowerCase()
+
+if(text.includes("help")||text.includes("save me")){
+panic()
+}
+
+}
+
+recognition.start()
+
+}
+
+
+
+// DANGER DETECTION
+
+function checkDanger(crimes){
+
+navigator.geolocation.watchPosition(pos=>{
+
+let userLat=pos.coords.latitude
+let userLon=pos.coords.longitude
+
+crimes.forEach(c=>{
+
+let dist=getDistance(userLat,userLon,c[0],c[1])
+
+if(dist<200){
+alert("⚠ WARNING: High crime area nearby!")
+}
+
+})
+
+})
+
+}
+
+
+
+// DISTANCE
+
+function getDistance(lat1,lon1,lat2,lon2){
+
+const R=6371e3
+
+const φ1=lat1*Math.PI/180
+const φ2=lat2*Math.PI/180
+
+const Δφ=(lat2-lat1)*Math.PI/180
+const Δλ=(lon2-lon1)*Math.PI/180
+
+const a=
+Math.sin(Δφ/2)*Math.sin(Δφ/2)+
+Math.cos(φ1)*Math.cos(φ2)*
+Math.sin(Δλ/2)*Math.sin(Δλ/2)
+
+const c=2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a))
+
+return R*c
+
+}
+
+</script>
+
+</body>
+</html>
